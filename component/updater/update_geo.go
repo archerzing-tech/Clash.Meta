@@ -44,12 +44,15 @@ func SetGeoUpdateInterval(newGeoUpdateInterval int) {
 	updateInterval = newGeoUpdateInterval
 }
 
-func UpdateMMDB() (err error) {
+// The lane names a proxy the download dials through, as the tunnel knows it:
+// empty is the phone's own direct walk, "GLOBAL" rides the tunnel's own
+// selection. A lane the tunnel cannot resolve answers like a failed dial.
+func UpdateMMDB(lane string) (err error) {
 	sendGeoUpdateStatus("MMDB", true, false, nil)
 	var skipped bool
 	defer func() { sendGeoUpdateStatus("MMDB", false, skipped, err) }()
 
-	vehicle := resource.NewHTTPVehicle(geodata.MmdbUrl(), C.Path.MMDB(), "", nil, defaultHttpTimeout, 0)
+	vehicle := resource.NewHTTPVehicle(geodata.MmdbUrl(), C.Path.MMDB(), lane, nil, defaultHttpTimeout, 0)
 	var oldHash utils.HashType
 	if buf, err := os.ReadFile(vehicle.Path()); err == nil {
 		oldHash = utils.MakeHash(buf)
@@ -81,12 +84,12 @@ func UpdateMMDB() (err error) {
 	return nil
 }
 
-func UpdateASN() (err error) {
+func UpdateASN(lane string) (err error) {
 	sendGeoUpdateStatus("ASN", true, false, nil)
 	var skipped bool
 	defer func() { sendGeoUpdateStatus("ASN", false, skipped, err) }()
 
-	vehicle := resource.NewHTTPVehicle(geodata.ASNUrl(), C.Path.ASN(), "", nil, defaultHttpTimeout, 0)
+	vehicle := resource.NewHTTPVehicle(geodata.ASNUrl(), C.Path.ASN(), lane, nil, defaultHttpTimeout, 0)
 	var oldHash utils.HashType
 	if buf, err := os.ReadFile(vehicle.Path()); err == nil {
 		oldHash = utils.MakeHash(buf)
@@ -118,14 +121,14 @@ func UpdateASN() (err error) {
 	return nil
 }
 
-func UpdateGeoIp() (err error) {
+func UpdateGeoIp(lane string) (err error) {
 	sendGeoUpdateStatus("GEOIP", true, false, nil)
 	var skipped bool
 	defer func() { sendGeoUpdateStatus("GEOIP", false, skipped, err) }()
 
 	geoLoader, err := geodata.GetGeoDataLoader("standard")
 
-	vehicle := resource.NewHTTPVehicle(geodata.GeoIpUrl(), C.Path.GeoIP(), "", nil, defaultHttpTimeout, 0)
+	vehicle := resource.NewHTTPVehicle(geodata.GeoIpUrl(), C.Path.GeoIP(), lane, nil, defaultHttpTimeout, 0)
 	var oldHash utils.HashType
 	if buf, err := os.ReadFile(vehicle.Path()); err == nil {
 		oldHash = utils.MakeHash(buf)
@@ -154,14 +157,14 @@ func UpdateGeoIp() (err error) {
 	return nil
 }
 
-func UpdateGeoSite() (err error) {
+func UpdateGeoSite(lane string) (err error) {
 	sendGeoUpdateStatus("GEOSITE", true, false, nil)
 	var skipped bool
 	defer func() { sendGeoUpdateStatus("GEOSITE", false, skipped, err) }()
 
 	geoLoader, err := geodata.GetGeoDataLoader("standard")
 
-	vehicle := resource.NewHTTPVehicle(geodata.GeoSiteUrl(), C.Path.GeoSite(), "", nil, defaultHttpTimeout, 0)
+	vehicle := resource.NewHTTPVehicle(geodata.GeoSiteUrl(), C.Path.GeoSite(), lane, nil, defaultHttpTimeout, 0)
 	var oldHash utils.HashType
 	if buf, err := os.ReadFile(vehicle.Path()); err == nil {
 		oldHash = utils.MakeHash(buf)
@@ -197,18 +200,18 @@ func updateGeoDatabases() error {
 
 	if geodata.GeoIpEnable() {
 		if geodata.GeodataMode() {
-			b.Go(UpdateGeoIp)
+			b.Go(func() error { return UpdateGeoIp("") })
 		} else {
-			b.Go(UpdateMMDB)
+			b.Go(func() error { return UpdateMMDB("") })
 		}
 	}
 
 	if geodata.ASNEnable() {
-		b.Go(UpdateASN)
+		b.Go(func() error { return UpdateASN("") })
 	}
 
 	if geodata.GeoSiteEnable() {
-		b.Go(UpdateGeoSite)
+		b.Go(func() error { return UpdateGeoSite("") })
 	}
 
 	return b.Wait()
